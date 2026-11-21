@@ -5,8 +5,8 @@ import { executeQuery } from "@/lib/actions/sql";
 import { handlerWithAudit } from "@/lib/audit";
 import { db } from "@/lib/db/drizzle";
 import { evaluations } from "@/lib/db/migrations/schema";
+import { formatTrialsForExport, type SerializedTrial } from "@/lib/evaluation/export";
 import { DownloadFormat } from "@/lib/types";
-import { tryParseJson } from "@/lib/utils";
 
 export const GET = handlerWithAudit(
   { resource: "evaluation", action: "export", read: true },
@@ -47,32 +47,9 @@ export const GET = handlerWithAudit(
         projectId,
         evaluationId,
       },
-    })) as {
-      id: string;
-      taskId: string;
-      index: number;
-      executorOutput: string;
-      data: string;
-      target: string;
-      metadata: string;
-      scores: string;
-    }[];
+    })) as SerializedTrial[];
 
-    const trials = chTrials.map((trial) => ({
-      ...trial,
-      scores: (tryParseJson(trial.scores) as Record<string, number | null>) ?? trial.scores,
-      data: tryParseJson(trial.data) ?? trial.data,
-      target: tryParseJson(trial.target) ?? trial.target,
-      executorOutput: tryParseJson(trial.executorOutput) ?? trial.executorOutput,
-    }));
-
-    const flattenedResults = trials.map((result) => {
-      const { scores, ...rest } = result;
-      return {
-        ...rest,
-        ...scores,
-      };
-    });
+    const flattenedResults = formatTrialsForExport(chTrials);
 
     // else the format is json, return the results as json
     if (format === DownloadFormat.JSON) {
